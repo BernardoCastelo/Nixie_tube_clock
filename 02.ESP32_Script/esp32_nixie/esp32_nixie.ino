@@ -14,8 +14,9 @@ volatile bool isShufflingHours = false;
 volatile bool isConnecting = false;
 volatile int tmpCalc;
 
-void setup() {
-  //Serial.begin(9600);
+void setup()
+{
+  Serial.begin(9600);
   pinMode(OE_H, OUTPUT);
   pinMode(OE_M, OUTPUT);
   pinMode(OE_S, OUTPUT);
@@ -41,14 +42,16 @@ void setup() {
   digitalWrite(DATA_PIN, LOW);
 
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(500);
     Serial.print(".");
   }
   Serial.println(" CONNECTED");
 
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  while (!getLocalTime(&timeinfo)) {
+  while (!getLocalTime(&timeinfo))
+  {
     Serial.println("Failed to obtain time");
   }
 
@@ -58,46 +61,54 @@ void setup() {
 
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
-  
+
   digitalWrite(OE_H, LOW);
   digitalWrite(OE_M, LOW);
   digitalWrite(OE_S, LOW);
 }
 
-void loop() {
-  if (isShufflingSeconds) {
+void loop()
+{
+  if (isShufflingSeconds)
+  {
     writeDisplay(SECOND, random(0, 99));
-    delay(10);
   }
 
-  if (isShufflingMinutes) {
+  if (isShufflingMinutes)
+  {
     writeDisplay(MINUTE, random(0, 99));
-    delay(10);
   }
 
-  if (isShufflingHours) {
+  if (isShufflingHours)
+  {
     writeDisplay(HOUR, random(0, 99));
-    delay(10);
   }
+  delay(10);
+  if(hours == 2)
+    updateDaylightSavings();
 
   /*
      Synchronous (dumb) time counter and minute/hour calculator,
      as is it deviates about 1 minute for every 6H.
   */
-  if (millis() - millisValue > 1000) {
+  if (millis() - millisValue > 995)
+  {
     millisValue = millis();
     seconds++;
     shuffle();
-    if ( seconds >= 60) {
+    if (seconds >= 60)
+    {
       seconds = 0;
       minutes++;
-      if ( minutes >= 60) {
+
+      if (minutes >= 60)
+      {
         minutes = 0;
         hours++;
 
-        if ( hours >= 24) {
+        if (hours >= 24)
+        {
           hours = 0;
-
         }
       }
     }
@@ -110,49 +121,59 @@ void loop() {
      NTP Getter region, get the time from a ntp server specified in "ntpServer" with a periodicity of "ntpGetPeriod" miliseconds.
   */
   tmpCalc = millis() - ntpMillisValue;
-  if (tmpCalc > ntpGetPeriod || isConnecting) {
+  if (tmpCalc > ntpGetPeriod || isConnecting)
+  {
     ntpMillisValue = millis();
-    if (tmpCalc - ntpGetPeriod > 60000) { // If it fails after 60s, retry again in the next period
+    if (tmpCalc - ntpGetPeriod > 60000)
+    { // If it fails after 60s, retry again in the next period
       finishNtpGetter();
       return;
     }
-    if (!isConnecting) {
+    if (!isConnecting)
+    {
       WiFi.begin(ssid, password);
       isConnecting = true;
     }
-    if (WiFi.status() == WL_CONNECTED) {
+    if (WiFi.status() == WL_CONNECTED)
+    {
       configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-      if (getLocalTime(&timeinfo)) {
+      if (getLocalTime(&timeinfo))
+      {
         hours = timeinfo.tm_hour;
         minutes = timeinfo.tm_min;
         seconds = timeinfo.tm_sec;
         finishNtpGetter();
       }
     }
-
   }
 }
 
-void finishNtpGetter() {
+void finishNtpGetter()
+{
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
   isConnecting = false;
   ntpMillisValue = millis();
 }
 
-void shuffle() {
-  if (!isShufflingMinutes) {
+void shuffle()
+{
+  if (!isShufflingMinutes)
+  {
     isShufflingHours = false;
   }
-  if (!isShufflingSeconds) {
+  if (!isShufflingSeconds)
+  {
     isShufflingMinutes = false;
   }
-  if (seconds == 30 ) { // Shuffles every minute at the 30s mark.
+  if (minutes == 15)
+  { // Shuffles every hour.
     isShufflingSeconds = true;
     isShufflingMinutes = true;
     isShufflingHours = true;
   }
-  else {
+  else
+  {
     isShufflingSeconds = false;
   }
 }
@@ -162,7 +183,8 @@ void shuffle() {
    decadeSeparator(26) = 0110  0010
                          (6)   (2)
 */
-byte decadeSeparator(byte num) {
+byte decadeSeparator(byte num)
+{
   byte separated = num - (num / 10) * 10;
   separated--;
   if (separated < 0 || separated > 9)
@@ -175,20 +197,21 @@ byte decadeSeparator(byte num) {
   return separated;
 }
 
-
 /*
     h - hours
     m - minutes
     s - seconds
 */
-void writeDisplay(DigitType type, byte value) {
+void writeDisplay(DigitType type, byte value)
+{
   value = decadeSeparator(value);
   byte bitSelector = 0b10000000;
   bool val = false;
   digitalWrite(STR_H, type == HOUR);
   digitalWrite(STR_M, type == MINUTE);
   digitalWrite(STR_S, type == SECOND);
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 8; i++)
+  {
     val = value & bitSelector;
     digitalWrite(DATA_PIN, val);
     digitalWrite(CLK_PIN, LOW);
@@ -197,5 +220,43 @@ void writeDisplay(DigitType type, byte value) {
     delay(CLK);
     digitalWrite(CLK_PIN, LOW);
     bitSelector = bitSelector >> 1;
+  }
+}
+
+void updateDaylightSavings()
+{
+  if (getLocalTime(&timeinfo))
+  {
+    int day = timeinfo.tm_mday;
+    int month = timeinfo.tm_mon;
+    int dayOfTheWeek = timeinfo.tm_wday;
+    int remainingDays = day - 25;
+
+    if (month > 3 && month < 10)
+    {
+      daylightOffset_sec = 3600;
+    }
+
+    if (month > 10 && month < 3)
+    {
+      daylightOffset_sec = 0;
+    }
+
+    if (month == 3 && day > 24 && dayOfTheWeek <= remainingDays)
+    {
+      daylightOffset_sec = 3600;
+    }
+
+    if (month == 10 && day > 24 && dayOfTheWeek <= remainingDays)
+    {
+      daylightOffset_sec = 0;
+    }
+  }
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  if (getLocalTime(&timeinfo))
+  {
+    hours = timeinfo.tm_hour;
+    minutes = timeinfo.tm_min;
+    seconds = timeinfo.tm_sec;
   }
 }
