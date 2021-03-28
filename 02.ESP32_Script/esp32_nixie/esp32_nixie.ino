@@ -55,9 +55,7 @@ void setup()
     Serial.println("Failed to obtain time");
   }
 
-  hours = timeinfo.tm_hour;
-  minutes = timeinfo.tm_min;
-  seconds = timeinfo.tm_sec;
+  updateTime();
 
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
@@ -84,8 +82,8 @@ void loop()
     writeDisplay(HOUR, random(0, 99));
   }
   delay(10);
-  if(hours == 2)
-    updateDaylightSavings();
+  if (hours == 2)
+    updateTime();
 
   /*
      Synchronous (dumb) time counter and minute/hour calculator,
@@ -136,14 +134,8 @@ void loop()
     }
     if (WiFi.status() == WL_CONNECTED)
     {
-      configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-      if (getLocalTime(&timeinfo))
-      {
-        hours = timeinfo.tm_hour;
-        minutes = timeinfo.tm_min;
-        seconds = timeinfo.tm_sec;
-        finishNtpGetter();
-      }
+      updateTime();
+      finishNtpGetter();
     }
   }
 }
@@ -223,12 +215,12 @@ void writeDisplay(DigitType type, byte value)
   }
 }
 
-void updateDaylightSavings()
+void updateTime()
 {
   if (getLocalTime(&timeinfo))
   {
     int day = timeinfo.tm_mday;
-    int month = timeinfo.tm_mon;
+    int month = timeinfo.tm_mon + 1;
     int dayOfTheWeek = timeinfo.tm_wday;
     int remainingDays = day - 25;
 
@@ -251,12 +243,13 @@ void updateDaylightSavings()
     {
       daylightOffset_sec = 0;
     }
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   }
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  if (getLocalTime(&timeinfo))
+  while (!getLocalTime(&timeinfo))
   {
-    hours = timeinfo.tm_hour;
-    minutes = timeinfo.tm_min;
-    seconds = timeinfo.tm_sec;
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   }
+  hours = timeinfo.tm_hour;
+  minutes = timeinfo.tm_min;
+  seconds = timeinfo.tm_sec;
 }
